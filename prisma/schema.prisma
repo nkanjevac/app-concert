@@ -1,0 +1,174 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ReservationStatus {
+  ACTIVE
+  CANCELLED
+}
+
+enum PromoStatus {
+  UNUSED
+  USED
+  INVALID
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  events    Event[]
+}
+
+model Venue {
+  id        String   @id @default(cuid())
+  name      String
+  address   String
+  city      String
+  country   String   @default("Serbia")
+  createdAt DateTime @default(now())
+
+  regions   SeatingRegion[]
+  shows     Show[]
+}
+
+model SeatingRegion {
+  id        String   @id @default(cuid())
+  name      String
+  capacity  Int
+
+  venueId   String
+  venue     Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  prices    ShowPrice[]
+  items     ReservationItem[]
+
+  @@unique([venueId, name]) // isti region (po imenu) ne može 2x u istoj lokaciji
+}
+
+model Event {
+  id          String   @id @default(cuid())
+  title       String
+  artist      String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id])
+
+  shows       Show[]
+}
+
+model Show {
+  id        String   @id @default(cuid())
+  startsAt  DateTime
+
+  eventId   String
+  venueId   String
+
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  venue     Venue    @relation(fields: [venueId], references: [id])
+
+  prices    ShowPrice[]
+  reservations Reservation[]
+
+  @@index([startsAt])
+  @@index([eventId])
+  @@index([venueId])
+}
+
+model ShowPrice {
+  id        String  @id @default(cuid())
+  priceRsd  Int     // cena u RSD (osnovna)
+
+  showId    String
+  regionId  String
+
+  show      Show         @relation(fields: [showId], references: [id], onDelete: Cascade)
+  region    SeatingRegion @relation(fields: [regionId], references: [id], onDelete: Cascade)
+
+  @@unique([showId, regionId]) // za dati termin i region samo jedna cena
+}
+
+model Currency {
+  code      String  @id // "RSD", "EUR", "USD"...
+  name      String
+  isEnabled Boolean @default(true)
+  createdAt DateTime @default(now())
+}
+
+model AppSettings {
+  id               String   @id @default(cuid())
+  baseCurrencyCode String   @default("RSD")
+  discountUntil    DateTime? // do ovog datuma važi 10% popust
+  updatedAt        DateTime  @updatedAt
+}
+
+model Reservation {
+  id           String   @id @default(cuid())
+
+  showId       String
+  show         Show     @relation(fields: [showId], references: [id])
+
+  fullName     String
+  email        String
+  phone        String?
+
+  accessCode   String   @unique // šifra za pristup 
+
+  status       ReservationStatus @default(ACTIVE)
+
+  // promo kod unet pri kupovini (5% popust)
+  promoCodeUsed String?
+
+  // valuta + kurs korišćen
+  currencyCode String   @default("RSD")
+  fxRateUsed   Float?   // npr. 1 EUR = 117.2 RSD (ako je valuta EUR)
+  totalRsd     Int
+  totalInCurrency Int?  // za prikaz u izabranoj valuti
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  items        ReservationItem[]
+  issuedPromo  PromoCode? @relation("IssuedPromo")
+
+  @@index([email])
+  @@index([showId])
+}
+
+model ReservationItem {
+  id            String   @id @default(cuid())
+
+  reservationId String
+  reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+
+  regionId      String
+  region        SeatingRegion @relation(fields: [regionId], references: [id])
+
+  qty           Int
+  unitPriceRsd  Int
+  lineTotalRsd  Int
+
+  createdAt     DateTime @default(now())
+
+  @@unique([reservationId, regionId]) // u jednoj rezervaciji 1 red po regionu
+}
+
+model PromoCode {
+  id            String      @id @default(cuid())
+  code          String      @unique
+  status        PromoStatus @default(UNUSED)
+  discountPct   Int         @default(5)
+  issuedByReservationId String @unique
+  issuedByReservation   Reservation @relation("IssuedPromo", fields: [issuedByReservationId], references: [id], onDelete: Cascade)
+
+  usedAt        DateTime?
+  createdAt     DateTime @default(now())
+}
