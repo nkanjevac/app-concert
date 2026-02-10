@@ -30,6 +30,17 @@ export default async function ReservePage({ params }: Props) {
     priceRsd: p.priceRsd,
   }));
 
+  const enabledCurrencies = await prisma.currency.findMany({
+    where: { isEnabled: true },
+    orderBy: { code: "asc" },   
+    select: { code: true },
+  });
+
+  const currencyOptions = [
+    { code: "RSD" },
+    ...enabledCurrencies.filter((c) => c.code !== "RSD"),
+  ];
+
   return (
     <main style={{ padding: 24 }}>
       <h1>
@@ -56,6 +67,7 @@ export default async function ReservePage({ params }: Props) {
         showId={show.id}
         prices={prices}
         discountUntilISO={discountUntil ? discountUntil.toISOString() : null}
+        currencies={currencyOptions.map((c) => c.code)}
       />
     </main>
   );

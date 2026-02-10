@@ -21,9 +21,7 @@ type Show = {
 };
 
 export default async function HomePage() {
-  const res = await fetch("http://localhost:3000/api/home", {
-    cache: "no-store",
-  });
+  const res = await fetch("http://localhost:3000/api/home");
 
   if (!res.ok) {
     return <div>Greška pri učitavanju koncerata.</div>;
