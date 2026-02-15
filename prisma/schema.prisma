@@ -21,8 +21,9 @@ model Category {
   id        String   @id @default(cuid())
   name      String   @unique
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  events    Event[]
+  events Event[]
 }
 
 model Venue {
@@ -32,23 +33,27 @@ model Venue {
   city      String
   country   String   @default("Serbia")
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  regions   SeatingRegion[]
-  shows     Show[]
+  regions SeatingRegion[]
+  shows   Show[]
 }
 
 model SeatingRegion {
-  id        String   @id @default(cuid())
-  name      String
-  capacity  Int
+  id       String @id @default(cuid())
+  name     String
+  capacity Int
 
-  venueId   String
-  venue     Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  sortOrder Int @default(0)
 
-  prices    ShowPrice[]
-  items     ReservationItem[]
+  venueId String
+  venue   Venue  @relation(fields: [venueId], references: [id], onDelete: Cascade)
 
-  @@unique([venueId, name]) // isti region (po imenu) ne može 2x u istoj lokaciji
+  prices ShowPrice[]
+  items  ReservationItem[]
+
+  @@unique([venueId, name])
+  @@index([venueId])
 }
 
 model Event {
@@ -59,23 +64,25 @@ model Event {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  categoryId  String
-  category    Category @relation(fields: [categoryId], references: [id])
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
 
-  shows       Show[]
+  shows Show[]
+
+  @@index([categoryId])
 }
 
 model Show {
-  id        String   @id @default(cuid())
-  startsAt  DateTime
+  id       String   @id @default(cuid())
+  startsAt DateTime
 
-  eventId   String
-  venueId   String
+  eventId String
+  venueId String
 
-  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  venue     Venue    @relation(fields: [venueId], references: [id])
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  venue Venue @relation(fields: [venueId], references: [id])
 
-  prices    ShowPrice[]
+  prices       ShowPrice[]
   reservations Reservation[]
 
   @@index([startsAt])
@@ -84,94 +91,106 @@ model Show {
 }
 
 model ShowPrice {
-  id        String  @id @default(cuid())
-  priceRsd  Int     // cena u RSD (osnovna)
+  id       String @id @default(cuid())
+  priceRsd Int // cena u RSD (osnovna)
 
-  showId    String
-  regionId  String
+  showId   String
+  regionId String
 
-  show      Show         @relation(fields: [showId], references: [id], onDelete: Cascade)
-  region    SeatingRegion @relation(fields: [regionId], references: [id], onDelete: Cascade)
+  show   Show          @relation(fields: [showId], references: [id], onDelete: Cascade)
+  region SeatingRegion @relation(fields: [regionId], references: [id], onDelete: Cascade)
 
-  @@unique([showId, regionId]) // za dati termin i region samo jedna cena
+  @@unique([showId, regionId])
+  @@index([showId])
+  @@index([regionId])
 }
 
 model Currency {
-  code      String  @id // "RSD", "EUR", "USD"...
+  code      String  @id // "RSD", "EUR", "USD"
   name      String
   isEnabled Boolean @default(true)
+
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isEnabled])
 }
 
 model AppSettings {
-  id               String   @id @default(cuid())
-  baseCurrencyCode String   @default("RSD")
-  discountUntil    DateTime? // do ovog datuma važi 10% popust
-  updatedAt        DateTime  @updatedAt
+  id String @id @default("singleton")
+
+  baseCurrencyCode String    @default("RSD")
+  discountUntil    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Reservation {
-  id           String   @id @default(cuid())
-  showId       String
-  show         Show     @relation(fields: [showId], references: [id])
+  id     String @id @default(cuid())
+  showId String
+  show   Show   @relation(fields: [showId], references: [id])
 
-  fullName     String
-  email        String
-  phone        String?
-  accessCode   String   @unique
-  status       ReservationStatus @default(ACTIVE)
+  fullName   String
+  email      String
+  phone      String?
+  accessCode String            @unique
+  status     ReservationStatus @default(ACTIVE)
 
   promoCodeUsed String?
 
-  currencyCode String   @default("RSD")
-  fxRateUsed   Float?
-  totalRsd     Int
+  currencyCode    String @default("RSD")
+  fxRateUsed      Float?
+  totalRsd        Int
   totalInCurrency Int?
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  items        ReservationItem[]
+  items ReservationItem[]
 
-  issuedPromo  PromoCode? @relation("IssuedPromo")
-  usedPromo    PromoCode? @relation("UsedPromo")
+  issuedPromo PromoCode? @relation("IssuedPromo")
+  usedPromo   PromoCode? @relation("UsedPromo")
 
   @@index([email])
   @@index([showId])
+  @@index([status])
 }
 
-
 model ReservationItem {
-  id            String   @id @default(cuid())
+  id String @id @default(cuid())
 
   reservationId String
   reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
 
-  regionId      String
-  region        SeatingRegion @relation(fields: [regionId], references: [id])
+  regionId String
+  region   SeatingRegion @relation(fields: [regionId], references: [id])
 
-  qty           Int
-  unitPriceRsd  Int
-  lineTotalRsd  Int
+  qty          Int
+  unitPriceRsd Int
+  lineTotalRsd Int
 
-  createdAt     DateTime @default(now())
+  createdAt DateTime @default(now())
 
-  @@unique([reservationId, regionId]) // u jednoj rezervaciji 1 red po regionu
+  @@unique([reservationId, regionId])
+  @@index([reservationId])
+  @@index([regionId])
 }
 
 model PromoCode {
-  id            String      @id @default(cuid())
-  code          String      @unique
-  status        PromoStatus @default(UNUSED)
-  discountPct   Int         @default(5)
+  id          String      @id @default(cuid())
+  code        String      @unique
+  status      PromoStatus @default(UNUSED)
+  discountPct Int         @default(5)
 
-  issuedByReservationId String @unique
+  issuedByReservationId String      @unique
   issuedByReservation   Reservation @relation("IssuedPromo", fields: [issuedByReservationId], references: [id], onDelete: Cascade)
 
-  usedByReservationId String?   @unique
+  usedByReservationId String?      @unique
   usedByReservation   Reservation? @relation("UsedPromo", fields: [usedByReservationId], references: [id])
 
-  usedAt        DateTime?
-  createdAt     DateTime @default(now())
-}
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
 
+  @@index([status])
+}
