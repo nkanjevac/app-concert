@@ -35,6 +35,9 @@ export default function Navbar() {
             Upravljaj kartom
           </Link>
 
+          <Link href="/admin" style={{ textDecoration: "none" }}>
+            Admin
+          </Link>
         </nav>
       </div>
     </header>

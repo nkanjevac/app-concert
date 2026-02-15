@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { getDiscountUntil } from "@/lib/settings";
 import ReserveForm from "./ReserveForm";
 
+export const runtime = "nodejs";
+
 type Props = {
   params: Promise<{ showId: string }>;
 };
@@ -11,18 +13,33 @@ export default async function ReservePage({ params }: Props) {
 
   if (!showId) return <main style={{ padding: 24 }}>Nedostaje showId.</main>;
 
-  const show = await prisma.show.findUnique({
-    where: { id: showId },
-    include: {
-      event: true,
-      venue: true,
-      prices: { include: { region: true } },
-    },
-  });
+  const [show, discountUntil, enabledCurrencies] = await Promise.all([
+    prisma.show.findUnique({
+      where: { id: showId },
+      select: {
+        id: true,
+        startsAt: true,
+        event: { select: { artist: true, title: true } },
+        venue: { select: { name: true, city: true } },
+        prices: {
+          select: {
+            id: true,
+            priceRsd: true,
+            region: { select: { id: true, name: true } },
+          },
+          orderBy: { priceRsd: "asc" },
+        },
+      },
+    }),
+    getDiscountUntil(),
+    prisma.currency.findMany({
+      where: { isEnabled: true },
+      orderBy: { code: "asc" },
+      select: { code: true },
+    }),
+  ]);
 
   if (!show) return <main style={{ padding: 24 }}>Termin nije pronađen.</main>;
-
-  const discountUntil = await getDiscountUntil();
 
   const prices = show.prices.map((p) => ({
     regionId: p.region.id,
@@ -30,14 +47,8 @@ export default async function ReservePage({ params }: Props) {
     priceRsd: p.priceRsd,
   }));
 
-  const enabledCurrencies = await prisma.currency.findMany({
-    where: { isEnabled: true },
-    orderBy: { code: "asc" },   
-    select: { code: true },
-  });
-
   const currencyOptions = [
-    { code: "RSD" },
+    { code: "RSD" as const },
     ...enabledCurrencies.filter((c) => c.code !== "RSD"),
   ];
 
@@ -50,7 +61,7 @@ export default async function ReservePage({ params }: Props) {
       <p>
         📍 {show.venue.name}, {show.venue.city}
       </p>
-      <p>📅 {new Date(show.startsAt).toLocaleString()}</p>
+      <p>📅 {new Date(show.startsAt).toLocaleString("sr-RS")}</p>
 
       <h2>Cene po regionima</h2>
       <ul>

@@ -1,3 +1,5 @@
+import { headers } from "next/headers";
+
 type Category = {
   id: string;
   name: string;
@@ -20,15 +22,49 @@ type Show = {
   };
 };
 
-export default async function HomePage() {
-  const res = await fetch("http://localhost:3000/api/home");
+async function getHomeData() {
+  const h = await headers();
+
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  const proto = h.get("x-forwarded-proto") ?? "http";
+
+  if (!host) {
+    const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+    const res = await fetch(`${base}/api/home`, { cache: "no-store" });
+
+    if (!res.ok) throw new Error("Neuspešno učitavanje početne.");
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "Greška pri učitavanju.");
+    return data.categories as Category[];
+  }
+
+  const baseUrl = `${proto}://${host}`;
+
+  const res = await fetch(`${baseUrl}/api/home`, {
+    cache: "no-store",
+  });
 
   if (!res.ok) {
-    return <div>Greška pri učitavanju koncerata.</div>;
+    throw new Error("Neuspešno učitavanje početne.");
   }
 
   const data = await res.json();
-  const categories: Category[] = data.categories;
+  if (!data.ok) {
+    throw new Error(data.error || "Greška pri učitavanju.");
+  }
+
+  return data.categories as Category[];
+}
+
+export default async function HomePage() {
+  let categories: Category[] = [];
+
+  try {
+    categories = await getHomeData();
+  } catch (e) {
+    console.error("HOME LOAD ERROR:", e);
+    return <div>Greška pri učitavanju koncerata.</div>;
+  }
 
   return (
     <main style={{ padding: 24 }}>
@@ -65,7 +101,7 @@ export default async function HomePage() {
                         href={`/reserve/${show.id}`}
                         style={{ textDecoration: "underline" }}
                       >
-                        {new Date(show.startsAt).toLocaleDateString()} –{" "}
+                        {new Date(show.startsAt).toLocaleDateString("sr-RS")} –{" "}
                         {show.venue.name}, {show.venue.city}
                       </a>
                     </li>
