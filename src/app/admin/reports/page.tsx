@@ -19,29 +19,23 @@ type ByVenueRow = {
   revenueRsd: number;
 };
 
-function Bar({ value, max }: { value: number; max: number }) {
-  const pct = max > 0 ? Math.round((value / max) * 100) : 0;
-
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <div style={{ flex: 1, background: "#f0f0f0", height: 10, borderRadius: 999 }}>
-        <div
-          style={{
-            width: `${pct}%`,
-            height: 10,
-            borderRadius: 999,
-            background: "#111",
-            transition: "width 0.3s ease",
-          }}
-        />
-      </div>
-      <span style={{ width: 70, textAlign: "right" }}>{value}</span>
-    </div>
-  );
-}
-
 function formatRsd(n: number) {
   return new Intl.NumberFormat("sr-RS").format(n) + " RSD";
+}
+
+function ProgressBar({ value, max }: { value: number; max: number }) {
+  const pct = max > 0 ? Math.round((value / max) * 100) : 0;
+  return (
+    <div className="flex items-center gap-3">
+      <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-200">
+        <div
+          className="h-2 rounded-full bg-zinc-900 transition-[width] duration-300"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <div className="w-16 text-right text-sm font-semibold text-zinc-900">{value}</div>
+    </div>
+  );
 }
 
 export default function AdminReportsPage() {
@@ -64,8 +58,8 @@ export default function AdminReportsPage() {
   async function load() {
     try {
       setErr(null);
-
       const suffix = qs();
+
       const [resShow, resVenue] = await Promise.all([
         fetch(`/api/admin/reports/by-show${suffix}`, { cache: "no-store" }),
         fetch(`/api/admin/reports/by-venue${suffix}`, { cache: "no-store" }),
@@ -85,6 +79,7 @@ export default function AdminReportsPage() {
       setLoading(false);
     }
   }
+
   useEffect(() => {
     load();
     const interval = setInterval(load, 5000);
@@ -103,176 +98,192 @@ export default function AdminReportsPage() {
   }, [byShow, byVenue]);
 
   return (
-    <main style={{ padding: 24 }}>
-      <h1>Admin – Izveštaji prodaje (real-time)</h1>
-      <p style={{ opacity: 0.7 }}>Računa se samo status: <b>ACTIVE</b>. Osvežavanje na 5 sekundi.</p>
-
-      <div
-        style={{
-          marginTop: 16,
-          padding: 12,
-          border: "1px solid #eee",
-          borderRadius: 12,
-          display: "flex",
-          gap: 12,
-          alignItems: "end",
-          flexWrap: "wrap",
-        }}
-      >
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-  <label htmlFor="fromDate" style={{ fontSize: 12, opacity: 0.7 }}>
-    Od (createdAt)
-  </label>
-  <input
-    id="fromDate"
-    type="date"
-    value={from}
-    onChange={(e) => setFrom(e.target.value)}
-  />
-</div>
-
-<div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-  <label htmlFor="toDate" style={{ fontSize: 12, opacity: 0.7 }}>
-    Do (createdAt)
-  </label>
-  <input
-    id="toDate"
-    type="date"
-    value={to}
-    onChange={(e) => setTo(e.target.value)}
-  />
-</div>
-
-
-        <button
-          type="button"
-          onClick={() => {
-            setFrom("");
-            setTo("");
-          }}
-          style={{ padding: "6px 10px" }}
-        >
-          Reset filter
-        </button>
-
-        <button type="button" onClick={load} style={{ padding: "6px 10px" }}>
-          Ručno osveži
-        </button>
+    <main className="mx-auto max-w-6xl px-4 py-10">
+      <div className="mb-6">
+        <div className="text-xs text-zinc-300/80">Admin</div>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white">
+          Izveštaji prodaje (real-time)
+        </h1>
+        <p className="mt-2 text-sm text-zinc-300">
+          Računa se samo status: <span className="font-semibold text-white">ACTIVE</span>
+        </p>
       </div>
 
-      <div style={{ marginTop: 16, display: "flex", gap: 16, flexWrap: "wrap" }}>
-        <div style={card}>
-          <div style={cardLabel}>Ukupno karata (po koncertima)</div>
-          <div style={cardValue}>{totals.soldShows}</div>
-          <div style={cardLabel}>Ukupan prihod (po koncertima)</div>
-          <div style={cardValueSmall}>{formatRsd(totals.revShows)}</div>
+      <div className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur">
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="flex flex-col gap-2">
+            <label htmlFor="fromDate" className="text-xs text-zinc-300/80">
+              Od (createdAt)
+            </label>
+            <input
+              id="fromDate"
+              type="date"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              className="w-44 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/15"
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <label htmlFor="toDate" className="text-xs text-zinc-300/80">
+              Do (createdAt)
+            </label>
+            <input
+              id="toDate"
+              type="date"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              className="w-44 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/15"
+            />
+          </div>
+
+          <div className="ml-auto flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setFrom("");
+                setTo("");
+              }}
+              className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10"
+            >
+              Reset filter
+            </button>
+
+            <button
+              type="button"
+              onClick={load}
+              className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+            >
+              Ručno osveži
+            </button>
+          </div>
         </div>
 
-        <div style={card}>
-          <div style={cardLabel}>Ukupno karata (po lokacijama)</div>
-          <div style={cardValue}>{totals.soldVenues}</div>
-          <div style={cardLabel}>Ukupan prihod (po lokacijama)</div>
-          <div style={cardValueSmall}>{formatRsd(totals.revVenues)}</div>
+        {err ? (
+          <div className="mt-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+            ❌ {err}
+          </div>
+        ) : null}
+
+        {loading ? <div className="mt-4 text-sm text-zinc-300">Učitavanje…</div> : null}
+      </div>
+
+      <div className="mt-6 grid gap-4 md:grid-cols-2">
+        <div className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur">
+          <div className="text-xs text-zinc-300/80">Po koncertima</div>
+          <div className="mt-3 grid grid-cols-2 gap-4">
+            <div>
+              <div className="text-xs text-zinc-300/80">Ukupno karata</div>
+              <div className="mt-1 text-3xl font-bold text-white">{totals.soldShows}</div>
+            </div>
+            <div>
+              <div className="text-xs text-zinc-300/80">Ukupan prihod</div>
+              <div className="mt-2 text-lg font-semibold text-white">{formatRsd(totals.revShows)}</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur">
+          <div className="text-xs text-zinc-300/80">Po lokacijama</div>
+          <div className="mt-3 grid grid-cols-2 gap-4">
+            <div>
+              <div className="text-xs text-zinc-300/80">Ukupno karata</div>
+              <div className="mt-1 text-3xl font-bold text-white">{totals.soldVenues}</div>
+            </div>
+            <div>
+              <div className="text-xs text-zinc-300/80">Ukupan prihod</div>
+              <div className="mt-2 text-lg font-semibold text-white">{formatRsd(totals.revVenues)}</div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {err && <p style={{ color: "crimson", marginTop: 12 }}>{err}</p>}
-      {loading && <p style={{ marginTop: 12 }}>Učitavanje...</p>}
+      <div className="mt-6 rounded-3xl bg-white text-zinc-900 shadow-sm">
+        <div className="p-5">
+          <section>
+            <h2 className="text-lg font-semibold">Kupljene karte po koncertima</h2>
+            <p className="mt-1 text-sm text-zinc-600">
+              Prikaz termina, broja prodatih karata i prihoda.
+            </p>
 
-      <section style={{ marginTop: 28 }}>
-        <h2>Feature 1 – Broj kupljenih karata po koncertima</h2>
+            <div className="mt-4 overflow-x-auto rounded-2xl border border-zinc-200">
+              <table className="w-full border-collapse text-sm">
+                <thead className="bg-zinc-50">
+                  <tr className="text-left">
+                    <th className="whitespace-nowrap px-4 py-3 font-semibold text-zinc-700">Koncert</th>
+                    <th className="whitespace-nowrap px-4 py-3 font-semibold text-zinc-700">Lokacija</th>
+                    <th className="whitespace-nowrap px-4 py-3 font-semibold text-zinc-700">Datum koncerta</th>
+                    <th className="whitespace-nowrap px-4 py-3 font-semibold text-zinc-700">Karte</th>
+                    <th className="whitespace-nowrap px-4 py-3 font-semibold text-zinc-700">Prihod</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {byShow.map((r) => (
+                    <tr key={r.showId} className="border-t border-zinc-200">
+                      <td className="px-4 py-3">
+                        <div className="font-semibold">{r.title}</div>
+                        <div className="text-xs text-zinc-500">{r.artist}</div>
+                      </td>
+                      <td className="px-4 py-3">{r.venueName}</td>
+                      <td className="px-4 py-3">{new Date(r.startsAt).toLocaleString("sr-RS")}</td>
+                      <td className="px-4 py-3">
+                        <ProgressBar value={r.sold} max={maxShowSold} />
+                      </td>
+                      <td className="px-4 py-3 font-semibold">{formatRsd(r.revenueRsd)}</td>
+                    </tr>
+                  ))}
+                  {byShow.length === 0 ? (
+                    <tr className="border-t border-zinc-200">
+                      <td className="px-4 py-6 text-zinc-600" colSpan={5}>
+                        Nema podataka za prikaz.
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </section>
 
-        <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 12 }}>
-          <thead>
-            <tr>
-              <th style={th}>Koncert</th>
-              <th style={th}>Lokacija</th>
-              <th style={th}>Datum koncerta</th>
-              <th style={th}>Karte</th>
-              <th style={th}>Prihod (RSD)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {byShow.map((r) => (
-              <tr key={r.showId}>
-                <td style={td}>
-                  <div style={{ fontWeight: 700 }}>{r.title}</div>
-                  <div style={{ opacity: 0.65 }}>{r.artist}</div>
-                </td>
-                <td style={td}>{r.venueName}</td>
-                <td style={td}>{new Date(r.startsAt).toLocaleString()}</td>
-                <td style={td}>
-                  <Bar value={r.sold} max={maxShowSold} />
-                </td>
-                <td style={td}>{formatRsd(r.revenueRsd)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
+          <section className="mt-10">
+            <h2 className="text-lg font-semibold"> Kupljene karte po lokacijama</h2>
+            <p className="mt-1 text-sm text-zinc-600">
+              Sumirano po lokacijama (venue).
+            </p>
 
-      <section style={{ marginTop: 40 }}>
-        <h2>Feature 2 – Broj kupljenih karata po lokacijama</h2>
-
-        <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 12 }}>
-          <thead>
-            <tr>
-              <th style={th}>Lokacija</th>
-              <th style={th}>Karte</th>
-              <th style={th}>Prihod (RSD)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {byVenue.map((r) => (
-              <tr key={r.venueId}>
-                <td style={td}>
-                  <div style={{ fontWeight: 700 }}>{r.venueName}</div>
-                </td>
-                <td style={td}>
-                  <Bar value={r.sold} max={maxVenueSold} />
-                </td>
-                <td style={td}>{formatRsd(r.revenueRsd)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
+            <div className="mt-4 overflow-x-auto rounded-2xl border border-zinc-200">
+              <table className="w-full border-collapse text-sm">
+                <thead className="bg-zinc-50">
+                  <tr className="text-left">
+                    <th className="whitespace-nowrap px-4 py-3 font-semibold text-zinc-700">Lokacija</th>
+                    <th className="whitespace-nowrap px-4 py-3 font-semibold text-zinc-700">Karte</th>
+                    <th className="whitespace-nowrap px-4 py-3 font-semibold text-zinc-700">Prihod</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {byVenue.map((r) => (
+                    <tr key={r.venueId} className="border-t border-zinc-200">
+                      <td className="px-4 py-3">
+                        <div className="font-semibold">{r.venueName}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <ProgressBar value={r.sold} max={maxVenueSold} />
+                      </td>
+                      <td className="px-4 py-3 font-semibold">{formatRsd(r.revenueRsd)}</td>
+                    </tr>
+                  ))}
+                  {byVenue.length === 0 ? (
+                    <tr className="border-t border-zinc-200">
+                      <td className="px-4 py-6 text-zinc-600" colSpan={3}>
+                        Nema podataka za prikaz.
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </div>
     </main>
   );
 }
-
-const th: React.CSSProperties = {
-  textAlign: "left",
-  borderBottom: "1px solid #ddd",
-  padding: 8,
-  whiteSpace: "nowrap",
-};
-
-const td: React.CSSProperties = {
-  borderBottom: "1px solid #eee",
-  padding: 8,
-  verticalAlign: "top",
-};
-
-const card: React.CSSProperties = {
-  border: "1px solid #eee",
-  borderRadius: 12,
-  padding: 12,
-  minWidth: 280,
-};
-
-const cardLabel: React.CSSProperties = {
-  fontSize: 12,
-  opacity: 0.7,
-};
-
-const cardValue: React.CSSProperties = {
-  fontSize: 24,
-  fontWeight: 800,
-  marginBottom: 8,
-};
-
-const cardValueSmall: React.CSSProperties = {
-  fontSize: 16,
-  fontWeight: 700,
-};
