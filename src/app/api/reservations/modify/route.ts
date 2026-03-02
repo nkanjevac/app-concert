@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { assertCapacityOrThrow } from "@/lib/capacity";
+import { publishTicketEvent } from "@/lib/streams";
+
+export const runtime = "nodejs";
 
 function toInt(v: FormDataEntryValue | null): number | null {
   if (v == null) return null;
@@ -26,10 +29,7 @@ export async function POST(req: Request) {
 
   const reservation = await prisma.reservation.findFirst({
     where: { email, accessCode },
-    include: {
-      show: true,
-      items: true,
-    },
+    include: { items: true },
   });
 
   if (!reservation) {
@@ -41,16 +41,11 @@ export async function POST(req: Request) {
   }
 
   const price = await prisma.showPrice.findUnique({
-    where: {
-      showId_regionId: { showId: reservation.showId, regionId },
-    },
+    where: { showId_regionId: { showId: reservation.showId, regionId } },
   });
 
   if (!price) {
-    return NextResponse.json(
-      { ok: false, error: "Cena za izabrani region nije pronađena." },
-      { status: 404 }
-    );
+    return NextResponse.json({ ok: false, error: "Cena za izabrani region nije pronađena." }, { status: 404 });
   }
 
   try {
@@ -70,24 +65,40 @@ export async function POST(req: Request) {
   const unitPriceRsd = price.priceRsd;
   const lineTotalRsd = unitPriceRsd * qty;
 
-  await prisma.reservation.update({
+  const updated = await prisma.reservation.update({
     where: { id: reservation.id },
     data: {
       items: {
         deleteMany: {},
-        create: [
-          {
-            regionId,
-            qty,
-            unitPriceRsd,
-            lineTotalRsd,
-          },
-        ],
+        create: [{ regionId, qty, unitPriceRsd, lineTotalRsd }],
       },
       totalRsd: lineTotalRsd,
       currencyCode: "RSD",
+      fxRateUsed: null,
+      totalInCurrency: null,
+    },
+    select: {
+      id: true,
+      accessCode: true,
+      showId: true,
+      email: true,
+      status: true,
+      totalRsd: true,
+      updatedAt: true,
+      items: { select: { regionId: true, qty: true, unitPriceRsd: true, lineTotalRsd: true } },
     },
   });
+
+  await publishTicketEvent("ticket.updated", {
+    reservationId: updated.id,
+    accessCode: updated.accessCode,
+    showId: updated.showId,
+    email: updated.email,
+    status: updated.status,
+    totalRsd: updated.totalRsd,
+    items: updated.items,
+    updatedAt: updated.updatedAt,
+  }).catch(() => {});
 
   return NextResponse.redirect(
     new URL(`/manage/${accessCode}?email=${encodeURIComponent(email)}&updated=1`, req.url)

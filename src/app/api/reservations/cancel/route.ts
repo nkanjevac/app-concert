@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { publishTicketEvent } from "@/lib/streams";
+
+export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   const form = await req.formData();
   const email = String(form.get("email") || "").trim();
   const accessCode = String(form.get("accessCode") || "").trim();
-
-  console.log("CANCEL REQUEST:", { email, accessCode });
 
   if (!email || !accessCode) {
     return NextResponse.json({ ok: false, error: "Nedostaju podaci." }, { status: 400 });
@@ -14,7 +15,12 @@ export async function POST(req: Request) {
 
   const reservation = await prisma.reservation.findFirst({
     where: { email, accessCode },
-    select: { id: true, status: true },
+    select: {
+      id: true,
+      status: true,
+      showId: true,
+      email: true,
+    },
   });
 
   if (!reservation) {
@@ -25,10 +31,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Karta je već otkazana." }, { status: 400 });
   }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.reservation.update({
+  const cancelled = await prisma.$transaction(async (tx) => {
+    const updated = await tx.reservation.update({
       where: { id: reservation.id },
       data: { status: "CANCELLED" },
+      select: {
+        id: true,
+        accessCode: true,
+        showId: true,
+        email: true,
+        status: true,
+        updatedAt: true,
+      },
     });
 
     const issuedPromo = await tx.promoCode.findFirst({
@@ -42,7 +56,18 @@ export async function POST(req: Request) {
         data: { status: "INVALID" },
       });
     }
+
+    return updated;
   });
+
+  await publishTicketEvent("ticket.cancelled", {
+    reservationId: cancelled.id,
+    accessCode: cancelled.accessCode,
+    showId: cancelled.showId,
+    email: cancelled.email,
+    status: cancelled.status,
+    cancelledAt: cancelled.updatedAt,
+  }).catch(() => {});
 
   return NextResponse.redirect(
     new URL(`/manage/${accessCode}?email=${encodeURIComponent(email)}&cancelled=1`, req.url)

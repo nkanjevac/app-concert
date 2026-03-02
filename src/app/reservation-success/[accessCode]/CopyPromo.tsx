@@ -29,13 +29,12 @@ export default function CopyPromo({
     "inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold transition";
 
   const styles =
-  variant === "default"
-    ? "bg-zinc-900 text-white hover:bg-zinc-800"
-    : "bg-white/10 text-white border border-white/20 hover:bg-white/20";
-
+    variant === "default"
+      ? "bg-zinc-900 text-white hover:bg-zinc-800"
+      : "bg-white text-zinc-900 border border-zinc-300 hover:bg-zinc-100";
 
   const successStyle = copied
-    ? "bg-green-50 text-green-700 border border-green-200"
+    ? "bg-green-50 text-zinc-900 border border-green-200"
     : styles;
 
   return (
