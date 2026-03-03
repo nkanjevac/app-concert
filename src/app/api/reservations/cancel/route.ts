@@ -20,6 +20,7 @@ export async function POST(req: Request) {
       status: true,
       showId: true,
       email: true,
+      items: { select: { regionId: true, qty: true, unitPriceRsd: true, lineTotalRsd: true } },
     },
   });
 
@@ -30,6 +31,14 @@ export async function POST(req: Request) {
   if (reservation.status === "CANCELLED") {
     return NextResponse.json({ ok: false, error: "Karta je već otkazana." }, { status: 400 });
   }
+
+  const showMeta = await prisma.show.findUnique({
+    where: { id: reservation.showId },
+    select: { eventId: true, venueId: true },
+  });
+
+  const totalQty = reservation.items.reduce((s, it) => s + (it.qty ?? 0), 0);
+  const ticketsDelta = -totalQty;
 
   const cancelled = await prisma.$transaction(async (tx) => {
     const updated = await tx.reservation.update({
@@ -64,8 +73,14 @@ export async function POST(req: Request) {
     reservationId: cancelled.id,
     accessCode: cancelled.accessCode,
     showId: cancelled.showId,
+    eventId: showMeta?.eventId ?? null,
+    venueId: showMeta?.venueId ?? null,
+
     email: cancelled.email,
     status: cancelled.status,
+
+    ticketsDelta, 
+    items: reservation.items, 
     cancelledAt: cancelled.updatedAt,
   }).catch(() => {});
 

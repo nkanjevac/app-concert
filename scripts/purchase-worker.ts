@@ -68,6 +68,11 @@ async function handle(evt: {
   });
   if (pr && (pr.status === "APPROVED" || pr.status === "REJECTED")) return;
 
+  const showMeta = await prisma.show.findUnique({
+    where: { id: showId },
+    select: { eventId: true, venueId: true },
+  });
+
   const price = await prisma.showPrice.findUnique({
     where: { showId_regionId: { showId, regionId } },
     include: { region: true, show: true },
@@ -122,11 +127,10 @@ async function handle(evt: {
 
   const accessCode = randomUUID();
 
-  await prisma.$transaction(async (tx) => {
+  const created = await prisma.$transaction(async (tx) => {
     const created = await tx.reservation.create({
       data: {
         purchaseEventId: eventId,
-
         showId,
         fullName,
         email,
@@ -141,7 +145,7 @@ async function handle(evt: {
           create: [{ regionId, qty, unitPriceRsd, lineTotalRsd }],
         },
       },
-      select: { id: true, accessCode: true },
+      select: { id: true, accessCode: true, showId: true },
     });
 
     if (promoIdToUse) {
@@ -165,9 +169,30 @@ async function handle(evt: {
       where: { eventId },
       data: { status: "APPROVED", accessCode: created.accessCode, error: null },
     });
+
+    return created;
   });
 
-  await publishTicketEvent("ticket.created", { purchaseEventId: eventId, accessCode });
+  await publishTicketEvent("ticket.created", {
+    reservationId: created.id,
+    purchaseEventId: eventId,
+    accessCode: created.accessCode,
+
+    showId: created.showId,
+    eventId: showMeta?.eventId ?? null,
+    venueId: showMeta?.venueId ?? null,
+
+    ticketsDelta: qty, 
+
+    items: [{ regionId, qty, unitPriceRsd, lineTotalRsd }],
+
+    totalRsd: pricing.totalRsd,
+    currencyCode: curr,
+    fxRateUsed,
+    totalInCurrency,
+
+    createdAt: new Date().toISOString(),
+  }).catch(() => {});
 }
 
 async function main() {
@@ -226,9 +251,21 @@ async function main() {
             })
             .catch(() => {});
 
+          const showMeta = await prisma.show
+            .findUnique({
+              where: { id: evt.showId },
+              select: { eventId: true, venueId: true },
+            })
+            .catch(() => null);
+
           await publishTicketEvent("ticket.purchase_rejected", {
             purchaseEventId: evt.eventId,
+            showId: evt.showId,
+            eventId: showMeta?.eventId ?? null,
+            venueId: showMeta?.venueId ?? null,
+            qty: evt.qty,
             error: err,
+            rejectedAt: new Date().toISOString(),
           }).catch(() => {});
 
           await redis.xAck(STREAM_PURCHASES, GROUP, id);

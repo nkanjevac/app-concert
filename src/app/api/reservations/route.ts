@@ -65,17 +65,33 @@ export async function POST(req: Request) {
     },
   });
 
-  await enqueuePurchaseRequested({
-    eventId,
-    occurredAt: new Date().toISOString(),
-    showId,
-    fullName,
-    email,
-    regionId,
-    qty,
-    promoCode,
-    currencyCode,
-  });
+  try {
+    await enqueuePurchaseRequested({
+      eventId,
+      occurredAt: new Date().toISOString(),
+      showId,
+      fullName,
+      email,
+      regionId,
+      qty,
+      promoCode,
+      currencyCode,
+    });
+  } catch (e: any) {
+    const err = e?.message ? String(e.message) : "Queue error";
+
+    await prisma.purchaseRequest
+      .update({
+        where: { eventId },
+        data: { status: "REJECTED", error: err, accessCode: null },
+      })
+      .catch(() => {});
+
+    return NextResponse.json(
+      { ok: false, error: "Sistem je trenutno nedostupan. Pokušaj ponovo." },
+      { status: 503 }
+    );
+  }
 
   return NextResponse.json({ ok: true, eventId }, { status: 202 });
 }

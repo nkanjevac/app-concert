@@ -37,15 +37,26 @@ export async function POST(req: Request) {
   }
 
   if (reservation.status === "CANCELLED") {
-    return NextResponse.json({ ok: false, error: "Otkazana karta ne može da se menja." }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, error: "Otkazana karta ne može da se menja." },
+      { status: 400 }
+    );
   }
+
+  const showMeta = await prisma.show.findUnique({
+    where: { id: reservation.showId },
+    select: { eventId: true, venueId: true },
+  });
 
   const price = await prisma.showPrice.findUnique({
     where: { showId_regionId: { showId: reservation.showId, regionId } },
   });
 
   if (!price) {
-    return NextResponse.json({ ok: false, error: "Cena za izabrani region nije pronađena." }, { status: 404 });
+    return NextResponse.json(
+      { ok: false, error: "Cena za izabrani region nije pronađena." },
+      { status: 404 }
+    );
   }
 
   try {
@@ -61,6 +72,10 @@ export async function POST(req: Request) {
       { status: 400 }
     );
   }
+
+  const oldQty = reservation.items.reduce((s, it) => s + (it.qty ?? 0), 0);
+  const newQty = qty;
+  const ticketsDelta = newQty - oldQty;
 
   const unitPriceRsd = price.priceRsd;
   const lineTotalRsd = unitPriceRsd * qty;
@@ -93,8 +108,13 @@ export async function POST(req: Request) {
     reservationId: updated.id,
     accessCode: updated.accessCode,
     showId: updated.showId,
+    eventId: showMeta?.eventId ?? null,
+    venueId: showMeta?.venueId ?? null,
+
     email: updated.email,
     status: updated.status,
+
+    ticketsDelta, 
     totalRsd: updated.totalRsd,
     items: updated.items,
     updatedAt: updated.updatedAt,
