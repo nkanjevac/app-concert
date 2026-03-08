@@ -70,8 +70,32 @@ async function handle(evt: {
 
   const showMeta = await prisma.show.findUnique({
     where: { id: showId },
-    select: { eventId: true, venueId: true },
+    select: {
+      id: true,
+      startsAt: true,
+      eventId: true,
+      venueId: true,
+      event: {
+        select: {
+          id: true,
+          title: true,
+          artist: true,
+        },
+      },
+      venue: {
+        select: {
+          id: true,
+          name: true,
+          city: true,
+          country: true,
+        },
+      },
+    },
   });
+
+  if (!showMeta) {
+    throw new Error("Termin nije pronađen.");
+  }
 
   const price = await prisma.showPrice.findUnique({
     where: { showId_regionId: { showId, regionId } },
@@ -179,10 +203,19 @@ async function handle(evt: {
     accessCode: created.accessCode,
 
     showId: created.showId,
-    eventId: showMeta?.eventId ?? null,
-    venueId: showMeta?.venueId ?? null,
+    eventId: showMeta.eventId ?? showMeta.event?.id ?? null,
+    venueId: showMeta.venueId ?? showMeta.venue?.id ?? null,
 
-    ticketsDelta: qty, 
+    eventTitle: showMeta.event?.title ?? null,
+    eventArtist: showMeta.event?.artist ?? null,
+
+    venueName: showMeta.venue?.name ?? null,
+    venueCity: showMeta.venue?.city ?? null,
+    venueCountry: showMeta.venue?.country ?? null,
+
+    startsAt: showMeta.startsAt?.toISOString() ?? null,
+
+    ticketsDelta: qty,
 
     items: [{ regionId, qty, unitPriceRsd, lineTotalRsd }],
 
@@ -254,15 +287,46 @@ async function main() {
           const showMeta = await prisma.show
             .findUnique({
               where: { id: evt.showId },
-              select: { eventId: true, venueId: true },
+              select: {
+                id: true,
+                startsAt: true,
+                eventId: true,
+                venueId: true,
+                event: {
+                  select: {
+                    id: true,
+                    title: true,
+                    artist: true,
+                  },
+                },
+                venue: {
+                  select: {
+                    id: true,
+                    name: true,
+                    city: true,
+                    country: true,
+                  },
+                },
+              },
             })
             .catch(() => null);
 
           await publishTicketEvent("ticket.purchase_rejected", {
             purchaseEventId: evt.eventId,
             showId: evt.showId,
-            eventId: showMeta?.eventId ?? null,
-            venueId: showMeta?.venueId ?? null,
+
+            eventId: showMeta?.eventId ?? showMeta?.event?.id ?? null,
+            venueId: showMeta?.venueId ?? showMeta?.venue?.id ?? null,
+
+            eventTitle: showMeta?.event?.title ?? null,
+            eventArtist: showMeta?.event?.artist ?? null,
+
+            venueName: showMeta?.venue?.name ?? null,
+            venueCity: showMeta?.venue?.city ?? null,
+            venueCountry: showMeta?.venue?.country ?? null,
+
+            startsAt: showMeta?.startsAt?.toISOString() ?? null,
+
             qty: evt.qty,
             error: err,
             rejectedAt: new Date().toISOString(),
